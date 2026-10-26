@@ -1,0 +1,10 @@
+[project]
+name = "02-agent-runtime"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=2.3.0",
+    "dotenv>=0.9.9",
+]

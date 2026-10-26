@@ -1,0 +1,21 @@
+# Local credentials
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Python environments and generated files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+wheels/
+*.egg-info/
+
+# macOS metadata
+.DS_Store
