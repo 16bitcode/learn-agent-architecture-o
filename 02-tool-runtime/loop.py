@@ -14,16 +14,20 @@ from tools import Registry, run_tool
 
 
 def run_turn(messages, model, registry: Registry, max_steps=10):
+    # 循环最大步数调用大模型
     for _ in range(max_steps):
+        # 调用大模型
         response = model(messages, registry)
+        # 将大模型返回加入messages
         messages.append({"role": "assistant", "content": response.content})
-
+        # 如果大模型返回结束调用，直接将结果返回给用户
         if response.stop_reason != "tool_use":
             return final_text(response)
-
+        # 将大模型返回的工具调用执行工具调用
         results = [
             _dispatch(b, registry) for b in response.content if b.type == "tool_use"
         ]
+        # 将工具调用执行结果加入到messages中
         messages.append({"role": "user", "content": results})
 
     raise RuntimeError("hit max_steps without end_turn")
@@ -32,12 +36,15 @@ def run_turn(messages, model, registry: Registry, max_steps=10):
 def _dispatch(block, registry):
     """解析 tool_use 代码块，运行它，并将输出封装为 tool_result。
     第 3 节和第 4 节将扩展此函数。"""
+    # 获取工具
     tool = registry.get(block.name)
+    # 执行工具
     content = (
         f"error: no tool {block.name!r}"
         if tool is None
         else run_tool(tool, block.input)
     )
+    # 返回工具执行结果
     return {"type": "tool_result", "tool_use_id": block.id, "content": content}
 
 
