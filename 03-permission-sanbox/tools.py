@@ -42,21 +42,24 @@ class Registry:
 
 def run_tool(tool: Tool, tool_input: dict) -> str:
     try:
-        return str(tool(tool_input))
+        return str(tool.run(tool_input))
     except Exception as e:
         return f"error: {type(e).__name__}: {e}"
 
 
 def run_concurrently(registry: Registry, calls: list[dict]) -> list[str]:
-    tools = [registry.get(c["name"] for c in calls)]
+    tools = [registry.get(c["name"]) for c in calls]
     out: dict[int, str] = {}
 
-    safe = [i for i, t in enumerate(tools) if t and t.is_concurrency_safe]
+    safe = [(i, t) for i, t in enumerate(tools) if t is not None and t.is_concurrency_safe]
     if safe:
         with ThreadPoolExecutor(max_workers=len(safe)) as pool:
-            for i, res in zip(
+            for (i, _), res in zip(
                 safe,
-                pool.map(lambda i: run_tool(tools[i], calls[i].get("input", {})), safe),
+                pool.map(
+                    lambda item: run_tool(item[1], calls[item[0]].get("input", {})),
+                    safe,
+                ),
             ):
                 out[i] = res
 

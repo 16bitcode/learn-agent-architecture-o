@@ -29,8 +29,29 @@ def run_turn(
             if b.type == "tool_use"
         ]
         messages.append({"role": "user", "content": results})
-        
-    raise RuntimeError('hit max_steps')
+
+    raise RuntimeError("hit max_steps")
 
 
 def _dispatch(block, registry, mode, allow_rules, approver):
+    name = block.name
+    tool = registry.get(name)
+    res = lambda content: {
+        "type": "tool_result",
+        "tool_use_id": block.id,
+        "content": content,
+    }
+    if tool is None:
+        return res(f"error: no tool {name}")
+
+    decision = permissions.decide(tool, mode, allow_rules)
+    if decision == "deny":
+        return res(f"{name} not allowed in {mode} mode")
+    if decision == "ask" and not approver(name, block.input):
+        return res(f"{name} denied by user")
+
+    return res(run_tool(tool, block.input))
+
+
+def final_text(response):
+    return "".join(b.text for b in response.content if b.type == "text")
