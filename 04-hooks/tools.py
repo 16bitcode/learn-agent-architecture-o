@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from typing import Any
+
+NO_INPUT = {
+    "type": "object",
+    "properties": {},
+}
+
+
+@dataclass
+class Tool:
+    name: str
+    run: Callable[[dict], Any]
+    description: str = ""
+    input_schema: dict = field(default_factory=lambda: dict(NO_INPUT))
+    is_read_only: bool = False
+    is_concurrency_safe: bool = False
+    is_edit: bool = False
+
+
+class Registry:
+    def __init__(self):
+        self._tools: dict[str, Tool] = {}
+
+    def registry(self, tool: Tool) -> None:
+        self._tools[tool.name] = tool
+
+    def get(self, name: str) -> Tool | None:
+        return self._tools.get(name)
+
+    def schemas(self) -> list[dict]:
+        return [
+            {
+                "name": t.name,
+                "description": t.description,
+                "input_schema": t.input_schema,
+            }
+            for t in self._tools.values()
+        ]
+
+
+def run_tool(tool: Tool, tool_input: dict) -> str:
+    try:
+        return str(tool.run(tool_input))
+    except Exception as e:
+        return f"error: {type(e).__name__}: {e}"
+
+
+def run_concurrently(registry: Registry, calls: list[dict]) -> list[str]:
+    tools = [registry.get(c["name"]) for c in calls]
+    out: dict[int, str] = {}
+
+    safe = [i for i, t in enumerate(tools) if t and t.is_concurrency_safe]
+    if safe:
+        with ThreadPoolExecutor(max_workers=len(safe)) as pool:
+            for i, res in zip(
+                safe,
+                pool.map(lambda i: run_tool(tools[i], calls[i].get("input", {})), safe),
+            ):
+                out[i] = res
+
+    for i, t in enumerate(tools):
+        if i not in out:
+            out[i] = (
+                f"error: no tool {calls[i]['name']}"
+                if t is None
+                else run_tool(t, calls[i].get("input", {}))
+            )
+
+    return [out[i] for i in range(len(tools))]
